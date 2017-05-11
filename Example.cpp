@@ -10,6 +10,8 @@
 #include "clang/Tooling/Tooling.h"
 #include "clang/Rewrite/Core/Rewriter.h"
 
+#include <iostream>
+
 using namespace std;
 using namespace clang;
 using namespace clang::driver;
@@ -34,10 +36,30 @@ public:
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
         numFunctions++;
         string funcName = func->getNameInfo().getName().getAsString();
+        string retType = func->getReturnType().getAsString();
+        string arg;
+        string int_type = "int";
+        int params = func->getNumParams();
         if (funcName == "do_math") {
             rewriter.ReplaceText(func->getLocation(), funcName.length(), "add5");
             errs() << "** Rewrote function def: " << funcName << "\n";
         }    
+        if (retType == "int") {
+            rewriter.ReplaceText(func->getLocStart(), retType.length(), "int16_t");
+            errs() << "** Rewrote function return: " << funcName << "\n";
+        }
+        if (params) {
+            cout << "params in " << funcName << endl;
+            for (int i = 0; i < params; ++i) {
+                arg = func->parameters()[i]->getType().getAsString();
+                // check if parameter begins with "int" -- covers int * type
+                if (arg.compare(0, int_type.length(), int_type) == 0) {
+                    rewriter.ReplaceText(func->parameters()[i]->getLocStart(), int_type.length(), "int16_t");
+                }
+                cout << arg << endl;
+            }
+        }
+
         return true;
     }
 
