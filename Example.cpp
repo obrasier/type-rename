@@ -58,7 +58,6 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
         numFunctions++;
         string retType = func->getReturnType().getAsString();
-        errs() << "return type: " << retType << "\n";
         string funcName = func->getNameInfo().getName().getAsString();
         string arg;
         int params = func->getNumParams();
@@ -67,22 +66,18 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         SourceLocation param_end;
         for (auto elem : type_replace) {
             if (retType == elem.first) {
-                // auto range = CharSourceRange(func->getReturnTypeSourceRange(), true);
                 auto begin_loc = func->getLocStart();
-                // getBeginLoc gives us the ( location, it would seem
+                // getLocStart gives us the ( location, it would seem
                 auto bracket_loc = func->getNameInfo().getLocStart();
-                // get the name length
-                int name_length = func->getNameInfo().getAsString().length();
+                // get the name length, add 1 for the space
+                int name_length = func->getNameInfo().getAsString().length() + 1;
                 // rewriter.ReplaceText(func->getLocStart(), retType.length(), "int16_t");
                 // gets the range of the total parameter - including type and argument
                 auto range_token = CharSourceRange::getTokenRange(begin_loc, bracket_loc);
                 // get the stringPtr from the range and convert to string
                 string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
-                errs() << "s: " << s << " length: " << s.length() << "\n";
-                // offset gives us the length of the argument, 1 is for the space
-                // int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts()) + 1;
                 // replace the text with the text sent
-                rewriter.ReplaceText(begin_loc, s.length() - name_length - 1, elem.second);
+                rewriter.ReplaceText(begin_loc, s.length() - name_length, elem.second);
                 // errs() << "** Rewrote function: " << funcName << "\n";
             }
         }
@@ -93,10 +88,23 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
                 arg = param->getType().getAsString();
                 for (auto elem : type_replace) {
                     if (arg == elem.first) {
-                        replace_text(param, elem.second);
+                        //replace_text(param, elem.second);
                     }
                 }
                 cout << arg << endl;
+            }
+        }
+
+        return true;
+    }
+
+    virtual bool VisitVarDecl(VarDecl *var) {
+
+        string var_type = var->getType().getAsString();
+        auto var_loc = var->getLocation();
+        for (auto elem : type_replace) {
+            if (var_type == elem.first) {
+                // need to do something, calling replace_text doesn't work except for func args
             }
         }
 
