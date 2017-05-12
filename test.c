@@ -1,8 +1,13 @@
-void do_math(int x, unsigned
+unsigned       
+
+int do_math(int x, unsigned
+
+
+
+  
 int  lolol) {
   x += 5;
 }
-
 
 int main(void) {
   int result = -1, val = 4;

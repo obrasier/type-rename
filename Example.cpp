@@ -58,16 +58,33 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
         numFunctions++;
         string retType = func->getReturnType().getAsString();
+        errs() << "return type: " << retType << "\n";
+        string funcName = func->getNameInfo().getName().getAsString();
         string arg;
-        string int_type = "unsigned int";
-        QualType arg2;
         int params = func->getNumParams();
-        SourceLocation func_start = func->getLocStart();
+        // SourceLocation func_start = func->getLocStart();
         SourceLocation param_start;
         SourceLocation param_end;
-        if (retType == "int") {
-            rewriter.ReplaceText(func->getLocStart(), retType.length(), "int16_t");
-            errs() << "** Rewrote function return: " << funcName << "\n";
+        for (auto elem : type_replace) {
+            if (retType == elem.first) {
+                // auto range = CharSourceRange(func->getReturnTypeSourceRange(), true);
+                auto begin_loc = func->getLocStart();
+                // getBeginLoc gives us the ( location, it would seem
+                auto bracket_loc = func->getNameInfo().getLocStart();
+                // get the name length
+                int name_length = func->getNameInfo().getAsString().length();
+                // rewriter.ReplaceText(func->getLocStart(), retType.length(), "int16_t");
+                // gets the range of the total parameter - including type and argument
+                auto range_token = CharSourceRange::getTokenRange(begin_loc, bracket_loc);
+                // get the stringPtr from the range and convert to string
+                string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+                errs() << "s: " << s << " length: " << s.length() << "\n";
+                // offset gives us the length of the argument, 1 is for the space
+                // int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts()) + 1;
+                // replace the text with the text sent
+                rewriter.ReplaceText(begin_loc, s.length() - name_length - 1, elem.second);
+                // errs() << "** Rewrote function: " << funcName << "\n";
+            }
         }
         if (params) {
             cout << "params in " << funcName << endl;
