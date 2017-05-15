@@ -121,11 +121,14 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
                     continue;
                 }
                 locs.push_back(var_loc);
-                auto name_loc = var->getLocEnd(); // location of name
-                int name_length = var_type.length() + 2;
+                auto name_loc = var->getLocation(); // location of name
+                int name_length = var_type.length();
                 auto range_token = CharSourceRange::getTokenRange(var_loc, name_loc);
                 string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
-                rewriter.ReplaceText(var_loc, s.length() - name_length , elem.second);
+
+                int offset = Lexer::MeasureTokenLength(name_loc, rewriter.getSourceMgr(), rewriter.getLangOpts()) + 1;
+                rewriter.ReplaceText(var_loc, s.length() - offset, elem.second);
+                errs() << "s is: " << s << " length is: " << s.length() << "\n";
                 // need to do something, calling replace_text doesn't work except for func args
             }
         }
