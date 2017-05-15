@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <iterator>
+#include <algorithm>
 
 using namespace std;
 using namespace clang;
@@ -29,11 +30,16 @@ Rewriter rewriter;
 int numFunctions = 0;
 
 pair<string, string> type_replace[5] = {{"unsigned int", "uint16_t"}, {"unsigned long", "uint32_t"}, {"int", "int16_t"}, {"long", "int32_t"}, {"double", "float"}};
+vector<SourceLocation> locs;
 
-// string decl_to_str(clang::Decl *d, )
 template<typename T>
 void replace_text(T input_decl, string r_text) {
     auto in_start = input_decl->getLocStart();
+    if (find(locs.begin(), locs.end(), in_start) != locs.end()) {
+        errs() << "skipping " << "\n";
+        return;
+    }
+    locs.push_back(in_start);
     auto in_end = input_decl->getLocEnd();
     // gets the range of the total parameter - including type and argument
     auto range = CharSourceRange::getTokenRange(in_start, in_end);
@@ -88,7 +94,7 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
                 arg = param->getType().getAsString();
                 for (auto elem : type_replace) {
                     if (arg == elem.first) {
-                        //replace_text(param, elem.second);
+                        replace_text(param, elem.second);
                     }
                 }
                 cout << arg << endl;
@@ -100,10 +106,26 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
 
     virtual bool VisitVarDecl(VarDecl *var) {
 
+        // auto var_loc = var->getLocation();
         string var_type = var->getType().getAsString();
-        auto var_loc = var->getLocation();
+
+
         for (auto elem : type_replace) {
+            vector<int> var_lines;
             if (var_type == elem.first) {
+                auto var_loc = var->getLocStart();
+                // int line_nm = rewriter.getSourceMgr().getPresumedLoc(var_loc).getLine();
+                // if the line_number exists, go to next iteration
+                if (find(locs.begin(), locs.end(), var_loc) != locs.end()) {
+                    errs() << "skipping " << "\n";
+                    continue;
+                }
+                locs.push_back(var_loc);
+                auto name_loc = var->getLocEnd(); // location of name
+                int name_length = var_type.length() + 2;
+                auto range_token = CharSourceRange::getTokenRange(var_loc, name_loc);
+                string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+                rewriter.ReplaceText(var_loc, s.length() - name_length , elem.second);
                 // need to do something, calling replace_text doesn't work except for func args
             }
         }
@@ -111,17 +133,17 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         return true;
     }
 
-    virtual bool VisitStmt(Stmt *st) {
-        if (ReturnStmt *ret = dyn_cast<ReturnStmt>(st)) {
-            rewriter.ReplaceText(ret->getRetValue()->getLocStart(), 6, "val");
-            errs() << "** Rewrote ReturnStmt\n";
-        }
-        if (CallExpr *call = dyn_cast<CallExpr>(st)) {
-            rewriter.ReplaceText(call->getLocStart(), 7, "add5");
-            errs() << "** Rewrote function call\n";
-        }
-        return true;
-    }
+    // virtual bool VisitStmt(Stmt *st) {
+    //     if (ReturnStmt *ret = dyn_cast<ReturnStmt>(st)) {
+    //         rewriter.ReplaceText(ret->getRetValue()->getLocStart(), 6, "val");
+    //         errs() << "** Rewrote ReturnStmt\n";
+    //     }
+    //     if (CallExpr *call = dyn_cast<CallExpr>(st)) {
+    //         rewriter.ReplaceText(call->getLocStart(), 7, "add5");
+    //         errs() << "** Rewrote function call\n";
+    //     }
+    //     return true;
+    // }
 
     /*
         virtual bool VisitReturnStmt(ReturnStmt *ret) {
