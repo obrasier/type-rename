@@ -10,16 +10,20 @@ void setup(void);
 #line 16 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
 void loop(void);
 #line 24 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
-int16_t my_func(int16_t y);
+int my_func(int y);
 #line 3 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
-int16_t test_fuc2(uint16_t * LOL, uint16_t hi) {
+int test_fuc2(unsigned
+
+int * LOL, unsigned int
+
+hi) {
   return 2;
 }
 
 void setup(void) {
   pinMode(13, OUTPUT);
 }
-int16_t count = 0;
+int count = 0;
 
 void loop(void) {
   digitalWrite(13, HIGH);
@@ -29,7 +33,7 @@ void loop(void) {
   Serial.println("hi!!!");
 }
 
-int16_t my_func(int16_t y) {
+int my_func(int y) {
   return 2*y;
 }
 
