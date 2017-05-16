@@ -4,26 +4,22 @@
 #include <Esplora.h>
 
 #line 3 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
-int test_fuc2(unsigned int * LOL, unsigned int hi);
+int16_t test_fuc2(uint16_t * LOL, uint16_t hi);
 #line 11 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
 void setup(void);
 #line 16 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
 void loop(void);
 #line 24 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
-int my_func(int y);
+int16_t my_func(int16_t y);
 #line 3 "/home/owen/Arduino/sketch_may09a/sketch_may09a.ino"
-int test_fuc2(unsigned
-
-int * LOL, unsigned int
-
-hi) {
+int16_t test_fuc2(uint16_t * LOL, uint16_t hi) {
   return 2;
 }
 
 void setup(void) {
   pinMode(13, OUTPUT);
 }
-int count = 0;
+int16_t count = 0;
 
 void loop(void) {
   digitalWrite(13, HIGH);
@@ -33,7 +29,7 @@ void loop(void) {
   Serial.println("hi!!!");
 }
 
-int my_func(int y) {
+int16_t my_func(int16_t y) {
   return 2*y;
 }
 
