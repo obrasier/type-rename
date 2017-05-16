@@ -72,7 +72,7 @@ void replace_text(T input_decl, string r_text, bool end = true) {
     // get the stringPtr from the range and convert to string
     string s = string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
 
-    // offset gives us the length of the argument, 1 is for the space
+    // offset gives us the length 
     int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts());
     // replace the text with the text sent
     rewriter.ReplaceText(in_start, s.length() - offset, r_text);
