@@ -29,24 +29,46 @@ using namespace llvm;
 Rewriter rewriter;
 int numFunctions = 0;
 
-pair<string, string> type_replace[5] = {{"unsigned int", "uint16_t"}, {"unsigned long", "uint32_t"}, {"int", "int16_t"}, {"long", "int32_t"}, {"double", "float"}};
-vector<SourceLocation> locs;
+// all the types we want to replace - I have added a space to stop "int *hi = 2;"
+pair<string, string> type_replace[10] = {{"unsigned int", "uint16_t "},
+    {"unsigned long", "uint32_t "},
+    {"int", "int16_t "},
+    {"long", "int32_t "},
+    {"double", "float "},
+    {"unsigned int *", "uint16_t * "},
+    {"int *", "int16_t * "},
+    {"unsigned long *", "uint32_t * "},
+    {"long *", "int32_t * "},
+    {"double *", "float * "},
+};
+vector<SourceLocation> varaible_locations;
 
+
+// Replace the variable type for different input decl types
 template<typename T>
-void replace_text(T input_decl, string r_text) {
+void replace_text(T input_decl, string r_text, bool end = true) {
     auto in_start = input_decl->getLocStart();
-    if (find(locs.begin(), locs.end(), in_start) != locs.end()) {
-        errs() << "skipping " << "\n";
+    // setting it to in_start enables the use of auto for different input decls we use
+    auto in_end = in_start;
+
+    // if we have already replaced it, skip
+    if (find(varaible_locations.begin(), varaible_locations.end(), in_start) != varaible_locations.end())
         return;
-    }
-    locs.push_back(in_start);
-    auto in_end = input_decl->getLocEnd();
+    varaible_locations.push_back(in_start);
+    // if we want the locEnd or getLocation function - depends on decl type
+    if (end)
+        in_end = input_decl->getLocEnd();
+    else
+        in_end = input_decl->getLocation();
+
     // gets the range of the total parameter - including type and argument
     auto range = CharSourceRange::getTokenRange(in_start, in_end);
+
     // get the stringPtr from the range and convert to string
     string s = string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+
     // offset gives us the length of the argument, 1 is for the space
-    int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts()) + 1;
+    int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts());
     // replace the text with the text sent
     rewriter.ReplaceText(in_start, s.length() - offset, r_text);
 }
@@ -73,10 +95,14 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         for (auto elem : type_replace) {
             if (retType == elem.first) {
                 auto begin_loc = func->getLocStart();
+                // if starting location is found - we have replaced already - move along!
+                if (find(varaible_locations.begin(), varaible_locations.end(), begin_loc) != varaible_locations.end())
+                    continue;
+                varaible_locations.push_back(begin_loc);
                 // getLocStart gives us the ( location, it would seem
                 auto bracket_loc = func->getNameInfo().getLocStart();
                 // get the name length, add 1 for the space
-                int name_length = func->getNameInfo().getAsString().length() + 1;
+                int name_length = func->getNameInfo().getAsString().length();
                 // rewriter.ReplaceText(func->getLocStart(), retType.length(), "int16_t");
                 // gets the range of the total parameter - including type and argument
                 auto range_token = CharSourceRange::getTokenRange(begin_loc, bracket_loc);
@@ -88,7 +114,6 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
             }
         }
         if (params) {
-            cout << "params in " << funcName << endl;
             for (int i = 0; i < params; ++i) {
                 auto param = func->parameters()[i];
                 arg = param->getType().getAsString();
@@ -97,7 +122,6 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
                         replace_text(param, elem.second);
                     }
                 }
-                cout << arg << endl;
             }
         }
 
@@ -113,22 +137,7 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         for (auto elem : type_replace) {
             vector<int> var_lines;
             if (var_type == elem.first) {
-                auto var_loc = var->getLocStart();
-                // int line_nm = rewriter.getSourceMgr().getPresumedLoc(var_loc).getLine();
-                // if the line_number exists, go to next iteration
-                if (find(locs.begin(), locs.end(), var_loc) != locs.end()) {
-                    errs() << "skipping " << "\n";
-                    continue;
-                }
-                locs.push_back(var_loc);
-                auto name_loc = var->getLocation(); // location of name
-                int name_length = var_type.length();
-                auto range_token = CharSourceRange::getTokenRange(var_loc, name_loc);
-                string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
-
-                int offset = Lexer::MeasureTokenLength(name_loc, rewriter.getSourceMgr(), rewriter.getLangOpts()) + 1;
-                rewriter.ReplaceText(var_loc, s.length() - offset, elem.second);
-                errs() << "s is: " << s << " length is: " << s.length() << "\n";
+                replace_text(var, elem.second, false);
                 // need to do something, calling replace_text doesn't work except for func args
             }
         }
@@ -136,31 +145,6 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         return true;
     }
 
-    // virtual bool VisitStmt(Stmt *st) {
-    //     if (ReturnStmt *ret = dyn_cast<ReturnStmt>(st)) {
-    //         rewriter.ReplaceText(ret->getRetValue()->getLocStart(), 6, "val");
-    //         errs() << "** Rewrote ReturnStmt\n";
-    //     }
-    //     if (CallExpr *call = dyn_cast<CallExpr>(st)) {
-    //         rewriter.ReplaceText(call->getLocStart(), 7, "add5");
-    //         errs() << "** Rewrote function call\n";
-    //     }
-    //     return true;
-    // }
-
-    /*
-        virtual bool VisitReturnStmt(ReturnStmt *ret) {
-            rewriter.ReplaceText(ret->getRetValue()->getLocStart(), 6, "val");
-            errs() << "** Rewrote ReturnStmt\n";
-            return true;
-        }
-
-        virtual bool VisitCallExpr(CallExpr *call) {
-            rewriter.ReplaceText(call->getLocStart(), 7, "add5");
-            errs() << "** Rewrote function call\n";
-            return true;
-        }
-    */
 };
 
 
@@ -180,6 +164,7 @@ class ExampleASTConsumer : public ASTConsumer {
         /* we can use ASTContext to get the TranslationUnitDecl, which is
              a single Decl that collectively represents the entire source file */
         visitor->TraverseDecl(Context.getTranslationUnitDecl());
+        rewriter.overwriteChangedFiles();
     }
 
     /*
@@ -205,7 +190,7 @@ class ExampleFrontendAction : public ASTFrontendAction {
 };
 
 
-static llvm::cl::OptionCategory MyToolCategory("");
+static llvm::cl::OptionCategory MyToolCategory("type-rename");
 
 int main(int argc, const char **argv) {
     // parse the command-line args passed to your code
@@ -214,10 +199,10 @@ int main(int argc, const char **argv) {
     ClangTool Tool(op.getCompilations(), op.getSourcePathList());
 
     // run the Clang Tool, creating a new FrontendAction (explained below)
-    int result = Tool.run(newFrontendActionFactory<ExampleFrontendAction>().get());
+    Tool.run(newFrontendActionFactory<ExampleFrontendAction>().get());
 
-    errs() << "\nFound " << numFunctions << " functions.\n\n";
+    // errs() << "\nFound " << numFunctions << " functions.\n\n";
     // print out the rewritten source code ("rewriter" is a global var.)
     rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
-    return result;
+    return EXIT_SUCCESS;
 }

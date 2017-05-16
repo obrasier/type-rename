@@ -1,20 +1,11 @@
-unsigned       
-
-int do_math(int x, unsigned
-
-
-
-  
-long  lolol) {
+uint16_t do_math(int16_t x, uint32_t lolol) {
   x += 5;
 }
 
-int main(void) {
-  unsigned  
-  long result = -1, val = 4;
-  unsigned  
-  int lol = -1, newval = 4;
-  int x;
+int16_t main(void) {
+  uint32_t result = -1, val = 4;
+  uint16_t lol = -1, newval = 4;
+  int16_t x;
   do_math(val, result);
   return result;
 }

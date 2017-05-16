@@ -1,6 +1,8 @@
 OPT = -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
 INC = -I/usr/lib/llvm-3.8/include
-EXE=Example
+EXE=type-rename
+SRC=TypeRename.cpp
+
 
 LIB = -fno-rtti -lclang \
     -lclangFrontend -lclangDriver -lclangTooling \
@@ -19,9 +21,9 @@ LIB = -fno-rtti -lclang \
 all: $(EXE) 
 
 
-$(EXE): $(EXE).cpp
-	clang++ -o $(EXE) $(EXE).cpp $(OPT) $(INC) -g $(LIB) \
+$(EXE): $(SRC)
+	clang++ -o $(EXE) $(SRC) $(OPT) $(INC) -g $(LIB) \
     `llvm-config-3.8 --cxxflags --ldflags --libs all --system-libs`
 
 clean:
-	rm $(EXE) *.o *.dwo
+	rm $(EXE) *.dwo
