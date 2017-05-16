@@ -28,6 +28,9 @@ using namespace llvm;
 
 Rewriter rewriter;
 int numFunctions = 0;
+bool can_change = false;
+
+FileID main_file;
 
 // all the types we want to replace - I have added a space to stop "int *hi = 2;"
 pair<string, string> type_replace[10] = {{"unsigned int", "uint16_t "},
@@ -80,7 +83,10 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
   public:
     explicit ExampleVisitor(CompilerInstance *CI)
         : astContext(&(CI->getASTContext())) { // initialize private members
-        rewriter.setSourceMgr(astContext->getSourceManager(), astContext->getLangOpts());
+        SourceManager &SM = astContext->getSourceManager();
+        rewriter.setSourceMgr(SM, astContext->getLangOpts());
+        main_file = SM.getMainFileID();
+        
     }
 
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
@@ -89,11 +95,15 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
         string funcName = func->getNameInfo().getName().getAsString();
         string arg;
         int params = func->getNumParams();
+        FileID curr_file = astContext->getSourceManager().getFileID(func->getLocation());
+        if (!can_change && curr_file == main_file) {
+            can_change = true;
+        }
         // SourceLocation func_start = func->getLocStart();
         SourceLocation param_start;
         SourceLocation param_end;
         for (auto elem : type_replace) {
-            if (retType == elem.first) {
+            if (retType == elem.first && can_change) {
                 auto begin_loc = func->getLocStart();
                 // if starting location is found - we have replaced already - move along!
                 if (find(varaible_locations.begin(), varaible_locations.end(), begin_loc) != varaible_locations.end())
@@ -110,10 +120,9 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
                 string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
                 // replace the text with the text sent
                 rewriter.ReplaceText(begin_loc, s.length() - name_length, elem.second);
-                // errs() << "** Rewrote function: " << funcName << "\n";
             }
         }
-        if (params) {
+        if (params && can_change) {
             for (int i = 0; i < params; ++i) {
                 auto param = func->parameters()[i];
                 arg = param->getType().getAsString();
@@ -129,6 +138,8 @@ class ExampleVisitor : public RecursiveASTVisitor<ExampleVisitor> {
     }
 
     virtual bool VisitVarDecl(VarDecl *var) {
+        if (!can_change)
+            return true;
 
         // auto var_loc = var->getLocation();
         string var_type = var->getType().getAsString();
@@ -201,8 +212,6 @@ int main(int argc, const char **argv) {
     // run the Clang Tool, creating a new FrontendAction (explained below)
     Tool.run(newFrontendActionFactory<ExampleFrontendAction>().get());
 
-    // errs() << "\nFound " << numFunctions << " functions.\n\n";
-    // print out the rewritten source code ("rewriter" is a global var.)
-    rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
+    // rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
     return EXIT_SUCCESS;
 }

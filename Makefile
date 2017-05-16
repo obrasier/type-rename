@@ -23,7 +23,7 @@ all: $(EXE)
 
 $(EXE): $(SRC)
 	clang++ -o $(EXE) $(SRC) $(OPT) $(INC) -g $(LIB) \
-    `llvm-config-3.8 --cxxflags --ldflags --libs all --system-libs`
+    `llvm-config-3.8 --ldflags --libs all --system-libs`
 
 clean:
 	rm $(EXE) *.dwo
