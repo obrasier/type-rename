@@ -25,3 +25,9 @@ Then run:
 ```
 
 It will scan the AST of `my_file.cpp` and change the variables to what is specified in the pair at the top of `TypeRename.cpp`
+
+If you need to pass arguments to the `my_file.cpp` for execution (for example `-std=c++11` or include directories), just add them afterwards, for example:
+
+```bash
+./run_example.sh my_file.cpp -std=c++11 -I../path/to/include/dir -I/usr/lib/llvm-3.8/bin/../lib/clang/3.8.1/include
+```
