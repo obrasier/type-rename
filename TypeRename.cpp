@@ -93,9 +93,7 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
 
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
         FileID curr_file = astContext->getSourceManager().getFileID(func->getLocation());
-        if (!can_change && curr_file == main_file) 
-            can_change = true;
-        if (!can_change)
+        if (curr_file != main_file) 
             return true;
         string retType = func->getReturnType().getAsString();
         string funcName = func->getNameInfo().getName().getAsString();
@@ -141,7 +139,8 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     }
 
     virtual bool VisitVarDecl(VarDecl *var) {
-        if (!can_change)
+        FileID curr_file = astContext->getSourceManager().getFileID(var->getLocation());
+        if (curr_file != main_file) 
             return true;
 
         string var_type = var->getType().getAsString();

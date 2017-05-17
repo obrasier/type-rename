@@ -3,7 +3,7 @@ EXE=type-rename
 FILE="$1"
 shift
 remainder="$*"
-if [[ -z "${FILE}" ]]; then
+if [[ ! -f ${FILE} ]]; then
   echo "Please enter a file to change, like the following:"
   echo "$0 my_file.cpp"
   exit 1
