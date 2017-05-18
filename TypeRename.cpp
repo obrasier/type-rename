@@ -31,35 +31,68 @@ bool can_change = false;
 
 FileID main_file;
 
+const int num_types = 40;
+
+std::vector<std::pair<std::string, std::string>> types_to_replace;
+
+std::array<std::string, 3> prefixes = {"const ", "volatile ", "const volatile "};
+
+
+std::array<std::string, 10> suffixes = {"*", "&", "**", "&&", "***", "*const", "&const", "**const", "&&const" "***const"};
 // all the types we want to replace - I have added a space so the whitespace is controlled
 // by the pair below and not the source file
-pair<string, string> type_replace[10] = {{"unsigned int", "uint16_t "},
+std::pair<std::string, std::string> base_replace[5] = {
+    {"unsigned int", "uint16_t "},
     {"unsigned long", "uint32_t "},
     {"int", "int16_t "},
     {"long", "int32_t "},
     {"double", "float "},
-    {"unsigned int *", "uint16_t * "},
-    {"int *", "int16_t * "},
-    {"unsigned long *", "uint32_t * "},
-    {"long *", "int32_t * "},
-    {"double *", "float * "},
 };
 
+
+
+void fill_types() {
+    for (auto elem : base_replace) {
+        types_to_replace.push_back(elem);
+        for (auto s : suffixes)
+            types_to_replace.push_back(make_pair(elem.first + " " + s, elem.second + s + " "));
+        for (auto pre : prefixes) {
+            std::string pre_first = pre + elem.first;
+            std::string pre_second = pre + elem.second;
+            types_to_replace.push_back(make_pair(pre_first, pre_second));
+            for (auto suf : suffixes) {
+                std::string s_first = pre_first + " " + suf;
+                std::string s_second = pre_second + suf + " ";
+                types_to_replace.push_back(make_pair(s_first, s_second));
+            }
+        }
+    }
+
+
+}
+
+void print_types() {
+    cout << "\n\n" << "Printing types...." << endl;
+    for (auto elem : types_to_replace) {
+        cout << elem.first << "\t" << elem.second << endl;
+    }
+}
+
 // a vector to store changed locations
-vector<SourceLocation> varaible_locations;
+vector<SourceLocation> variable_locations;
 
 
 // Replace the variable type for different input decl types
 template<typename T>
-void replace_text(T input_decl, string r_text, bool end = true) {
+void replace_text(T input_decl, std::string r_text, bool end = true) {
     auto in_start = input_decl->getLocStart();
     // setting it to in_start enables the use of auto for different input decls we use
     auto in_end = in_start;
 
     // if we have already replaced it, skip
-    if (find(varaible_locations.begin(), varaible_locations.end(), in_start) != varaible_locations.end())
+    if (find(variable_locations.begin(), variable_locations.end(), in_start) != variable_locations.end())
         return;
-    varaible_locations.push_back(in_start);
+    variable_locations.push_back(in_start);
     // if we want the locEnd or getLocation function - depends on decl type
     if (end)
         in_end = input_decl->getLocEnd();
@@ -69,10 +102,10 @@ void replace_text(T input_decl, string r_text, bool end = true) {
     // gets the range of the total parameter - including type and argument
     auto range = CharSourceRange::getTokenRange(in_start, in_end);
 
-    // get the stringPtr from the range and convert to string
-    string s = string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+    // get the stringPtr from the range and convert to std::string
+    std::string s = std::string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
 
-    // offset gives us the length 
+    // offset gives us the length
     int offset = Lexer::MeasureTokenLength(in_end, rewriter.getSourceMgr(), rewriter.getLangOpts());
     // replace the text with the text sent
     rewriter.ReplaceText(in_start, s.length() - offset, r_text);
@@ -81,6 +114,14 @@ void replace_text(T input_decl, string r_text, bool end = true) {
 class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
   private:
     ASTContext *astContext; // used for getting additional AST info
+
+    template<typename T>
+    bool not_in_main(T v) {
+        FileID curr_file = astContext->getSourceManager().getFileID(v->getLocStart());
+        if (curr_file != main_file)
+            return true;
+        return false;
+    }
 
   public:
     explicit VarVisitor(CompilerInstance *CI)
@@ -92,32 +133,33 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     }
 
     virtual bool VisitFunctionDecl(FunctionDecl *func) {
-        FileID curr_file = astContext->getSourceManager().getFileID(func->getLocation());
-        if (curr_file != main_file) 
+        if (not_in_main(func))
             return true;
-        string retType = func->getReturnType().getAsString();
-        string funcName = func->getNameInfo().getName().getAsString();
-        string arg;
+        std::string retType = func->getReturnType().getAsString();
+        // errs() << "found function with returnType: " << retType << "\n";
+        std::string funcName = func->getNameInfo().getName().getAsString();
+        std::string arg;
         int params = func->getNumParams();
 
         // SourceLocation func_start = func->getLocStart();
         SourceLocation param_start;
         SourceLocation param_end;
-        for (auto elem : type_replace) {
+
+        for (auto elem : types_to_replace) {
             if (retType == elem.first) {
                 auto begin_loc = func->getLocStart();
                 // if starting location is found - we have replaced already - move along!
-                if (find(varaible_locations.begin(), varaible_locations.end(), begin_loc) != varaible_locations.end())
+                if (find(variable_locations.begin(), variable_locations.end(), begin_loc) != variable_locations.end())
                     continue;
-                varaible_locations.push_back(begin_loc);
+                variable_locations.push_back(begin_loc);
                 // getLocStart gives us the ( location, it would seem
                 auto bracket_loc = func->getNameInfo().getLocStart();
                 // get the name length
                 int name_length = func->getNameInfo().getAsString().length();
                 // gets the range of the total parameter - including type and argument
                 auto range_token = CharSourceRange::getTokenRange(begin_loc, bracket_loc);
-                // get the stringPtr from the range and convert to string
-                string s = string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+                // get the stringPtr from the range and convert to std::string
+                std::string s = std::string(Lexer::getSourceText(range_token, rewriter.getSourceMgr(), rewriter.getLangOpts()));
                 // replace the text with the text sent
                 rewriter.ReplaceText(begin_loc, s.length() - name_length, elem.second);
             }
@@ -127,7 +169,7 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
             for (int i = 0; i < params; ++i) {
                 auto param = func->parameters()[i];
                 arg = param->getType().getAsString();
-                for (auto elem : type_replace) {
+                for (auto elem : types_to_replace) {
                     if (arg == elem.first) {
                         replace_text(param, elem.second);
                     }
@@ -139,20 +181,155 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     }
 
     virtual bool VisitVarDecl(VarDecl *var) {
-        FileID curr_file = astContext->getSourceManager().getFileID(var->getLocation());
-        if (curr_file != main_file) 
+        if (not_in_main(var))
             return true;
 
-        string var_type = var->getType().getAsString();
+        std::string var_type = var->getType().getAsString();
+        bool is_static = var->isStaticLocal();
+        const Type *type = var->getType().getTypePtr();
+        bool is_array = type->isArrayType();
+
+        errs() << "found variable with type: " << var_type << " static: " << is_static << " arr: " << is_array << "\n";
+
+
+        if (is_array) {
+            const ArrayType *arr = type->getAsArrayTypeUnsafe();
+            var_type = arr->getElementType().getAsString();
+        }
 
         // visit each variable declaration and replace if necessary
-        for (auto elem : type_replace) {
+        for (auto elem : types_to_replace) {
             if (var_type == elem.first) {
                 replace_text(var, elem.second, false);
             }
         }
         return true;
     }
+
+    virtual bool VisitFieldDecl(FieldDecl *field) {
+        if (not_in_main(field))
+            return true;
+
+        std::string var_type = field->getType().getAsString();
+        // bool is_static = field->isStaticLocal();
+        const Type *type = field->getType().getTypePtr();
+        bool is_array = type->isArrayType();
+
+        errs() << "found field with type: " << var_type  << "\n";
+
+
+        if (is_array) {
+            const ArrayType *arr = type->getAsArrayTypeUnsafe();
+            var_type = arr->getElementType().getAsString();
+            // errs() << "array type " << var_type << "\n";type->isArrayType()
+        }
+
+        // visit each variable declaration and replace if necessary
+        for (auto elem : types_to_replace) {
+            if (var_type == elem.first) {
+                replace_text(field, elem.second, false);
+            }
+        }
+        return true;
+    }
+
+    // this works for statc_cast<int> dynamic_cast etc etc.
+    virtual bool VisitCXXNamedCastExpr(CXXNamedCastExpr *cast) {
+        if (not_in_main(cast))
+            return true;
+        cout << "FOUND A CAST!" << endl;
+        auto loc = cast->getAngleBrackets();
+        auto in_start = cast->getLocStart();
+        // setting it to in_start enables the use of auto for different input decls we use
+        auto in_end = cast->getLocEnd();
+        auto loc_begin = loc.getBegin();
+        auto loc_end = loc.getEnd();
+        SourceLocation var_start_loc = loc.getBegin().getLocWithOffset(1);
+        SourceLocation var_end_loc = loc.getEnd().getLocWithOffset(-1);
+
+        // // if we have already replaced it, skip
+        if (find(variable_locations.begin(), variable_locations.end(), var_start_loc) != variable_locations.end())
+            return true;
+        variable_locations.push_back(var_start_loc);
+        // if we want the locEnd or getLocation function - depends on decl type
+
+        // gets the range of the total parameter - including type and argument
+        auto range = CharSourceRange::getTokenRange(var_start_loc, var_end_loc);
+
+        // get the stringPtr from the range and convert to std::string
+        std::string type_name = std::string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
+        cout << "s is: " << type_name << endl;
+        for (auto type : types_to_replace) {
+            if (type_name == type.first) {
+                rewriter.ReplaceText(var_start_loc, type_name.length(), type.second);
+
+            }
+        }
+        return true;
+    }
+
+    virtual bool VisitCStyleCastExpr(CStyleCastExpr *cast) {
+        if (not_in_main(cast))
+            return true;
+        string type_name = cast->getTypeAsWritten().getAsString();
+        cout << "c cast type: " << type_name << endl;
+        for (auto t : types_to_replace) {
+            if (type_name == t.first) {
+                SourceLocation loc_start = cast->getTypeInfoAsWritten()->getTypeLoc().getLocStart();
+                SourceLocation loc_end = cast->getTypeInfoAsWritten()->getTypeLoc().getLocStart();
+
+                auto range = CharSourceRange::getTokenRange(loc_start, loc_end);
+                if (find(variable_locations.begin(), variable_locations.end(), loc_start) != variable_locations.end())
+                    continue;
+                variable_locations.push_back(loc_start);
+                rewriter.ReplaceText(loc_start, type_name.length(), t.second);
+                // get the stringPtr from the range and convert to std::string
+
+
+            }
+
+        }
+        return true;
+    }
+
+    virtual bool VisitCXXConstructExpr(CXXConstructExpr *expr) {
+        if (not_in_main(expr)) {
+            return true;
+        }
+        int num_args = expr->getNumArgs();
+        auto type = expr->getType().getAsString();
+        cout << "found CXXConstructExpr: " << type << " num_args: " << num_args << endl;
+        if (num_args) {
+            // for(auto i = expr->arg_begin();i != expr->arg_end(); ++i) {
+            //     arg = *i->getType().getAsString();
+            //     for (auto elem : types_to_replace) {
+            //         if (arg == elem.first) {
+            //             //replace_text(param, elem.second);
+            //         }
+            //     }
+            // }
+
+        }
+        return true;
+    }
+
+    // virtual bool VisitParmVarDecl(ParmVarDecl *parm) {
+    //     if (not_in_main(parm)) {
+    //         return true;
+    //     }
+    //     auto type = parm->getType().getAsString();
+    //     cout << "found ParmVarDecl: " << QualType::getAsString(parm->getType().split()) << endl;
+
+    //     return true;
+    // }
+
+    // virtual bool VisitDeclRefExpr(DeclRefExpr *expr) {
+    //     if (not_in_main(expr))
+    //         return true;
+
+    //     return true;
+
+    // }
 
 };
 
@@ -173,7 +350,7 @@ class VarASTConsumer : public ASTConsumer {
         /* we can use ASTContext to get the TranslationUnitDecl, which is
              a single Decl that collectively represents the entire source file */
         visitor->TraverseDecl(Context.getTranslationUnitDecl());
-        rewriter.overwriteChangedFiles();
+        // rewriter.overwriteChangedFiles();
     }
 
 };
@@ -191,6 +368,8 @@ class VarFrontendAction : public ASTFrontendAction {
 static llvm::cl::OptionCategory MyToolCategory("type-rename");
 
 int main(int argc, const char **argv) {
+    fill_types();
+    // print_types();
     // parse the command-line args passed to your code
     CommonOptionsParser op(argc, argv, MyToolCategory);
     // create a new Clang Tool instance (a LibTooling environment)
@@ -199,6 +378,6 @@ int main(int argc, const char **argv) {
     // run the Clang Tool, creating a new FrontendAction (explained below)
     Tool.run(newFrontendActionFactory<VarFrontendAction>().get());
 
-    // rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
+    rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
     return EXIT_SUCCESS;
 }
