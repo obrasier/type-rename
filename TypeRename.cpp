@@ -350,7 +350,7 @@ class VarASTConsumer : public ASTConsumer {
         /* we can use ASTContext to get the TranslationUnitDecl, which is
              a single Decl that collectively represents the entire source file */
         visitor->TraverseDecl(Context.getTranslationUnitDecl());
-        // rewriter.overwriteChangedFiles();
+        rewriter.overwriteChangedFiles();
     }
 
 };

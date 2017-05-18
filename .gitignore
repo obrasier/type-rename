@@ -3,4 +3,5 @@
 *.dwo
 type-rename
 *.bak
+*_new.cpp
 

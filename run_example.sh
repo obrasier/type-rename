@@ -8,7 +8,8 @@ if [[ ! -f ${FILE} ]]; then
   echo "$0 my_file.cpp"
   exit 1
 fi
-echo "Making backup in $FILE.bak"
-cp $FILE $FILE.bak
-./$EXE $FILE -- $remainder
+
+NEWFILE="${FILE%.cpp}"_new.cpp
+cp "$FILE" "$NEWFILE"
+./$EXE $NEWFILE -- $remainder
 
