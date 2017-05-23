@@ -369,6 +369,6 @@ int main(int argc, const char **argv) {
     // run the Clang Tool, creating a new FrontendAction (explained below)
     Tool.run(newFrontendActionFactory<VarFrontendAction>().get());
 
-    rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(errs());
+    rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(outs());
     return EXIT_SUCCESS;
 }
