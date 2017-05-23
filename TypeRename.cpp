@@ -182,8 +182,10 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         if (not_in_main(var))
             return true;
 
+        std::string new_type;
         std::string var_type = var->getType().getAsString();
         bool is_static = var->isStaticLocal();
+        bool is_static_member = var->isStaticDataMember();
         const Type *type = var->getType().getTypePtr();
         bool is_array = type->isArrayType();
 
@@ -194,10 +196,14 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
             var_type = arr->getElementType().getAsString();
         }
 
+
         // visit each variable declaration and replace if necessary
         for (auto elem : types_to_replace) {
             if (var_type == elem.first) {
-                replace_text(var, elem.second, false);
+                new_type = elem.second;
+                if (is_static_member || is_static)
+                    new_type = "static " + elem.second;
+                replace_text(var, new_type, false);
             }
         }
         return true;
@@ -255,7 +261,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         for (auto type : types_to_replace) {
             if (type_name == type.first) {
                 rewriter.ReplaceText(var_start_loc, type_name.length(), type.second);
-
             }
         }
         return true;
@@ -264,6 +269,7 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     virtual bool VisitCStyleCastExpr(CStyleCastExpr *cast) {
         if (not_in_main(cast))
             return true;
+        std::cout << "Visiting CStyleCastExpr\n";
         std::string type_name = cast->getTypeAsWritten().getAsString();
         for (auto t : types_to_replace) {
             if (type_name == t.first) {
@@ -284,34 +290,36 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         return true;
     }
 
-    virtual bool VisitCXXConstructExpr(CXXConstructExpr *expr) {
-        if (not_in_main(expr)) {
+    virtual bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl *decl) {
+        if (not_in_main(decl)) {
             return true;
         }
-        int num_args = expr->getNumArgs();
-        auto type = expr->getType().getAsString();
-        if (num_args) {
-            // for(auto i = expr->arg_begin();i != expr->arg_end(); ++i) {
-            //     arg = *i->getType().getAsString();
-            //     for (auto elem : types_to_replace) {
-            //         if (arg == elem.first) {
-            //             //replace_text(param, elem.second);
-            //         }
-            //     }
-            // }
-
-        }
+        // std::cout << "Visiting ClassTemplateSpecializationDecl\n";
+        // const TemplateArgumentList &template_args = decl->getTemplateArgs();
+        // int num_args = template_args.size();
+        // if (num_args) {
+        //     for(int i = 0; i < num_args; ++i) {
+        //         auto param = template_args.get(i);
+        //         std::string arg = param.getAsType().getAsString();
+        //         for (auto elem : types_to_replace) {
+        //             if (arg == elem.first) {
+        //                 errs() << "FOUND A TEMPLATE ARG\n";
+        //                 //replace_text(param, elem.second);
+        //             }
+        //         }
+        //     }
+        // }
         return true;
     }
 
-    // virtual bool VisitParmVarDecl(ParmVarDecl *parm) {
-    //     if (not_in_main(parm)) {
-    //         return true;
-    //     }
-    //     auto type = parm->getType().getAsString();
+    virtual bool VisitParmVarDecl(ParmVarDecl *parm) {
+        if (not_in_main(parm)) {
+            return true;
+        }
+        auto type = parm->getType().getAsString();
 
-    //     return true;
-    // }
+        return true;
+    }
 
     // virtual bool VisitDeclRefExpr(DeclRefExpr *expr) {
     //     if (not_in_main(expr))
