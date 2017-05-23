@@ -20,7 +20,6 @@
 #include <iterator>
 #include <algorithm>
 
-using namespace std;
 using namespace clang;
 using namespace clang::driver;
 using namespace clang::tooling;
@@ -71,14 +70,14 @@ void fill_types() {
 }
 
 void print_types() {
-    cout << "\n\n" << "Printing types...." << endl;
+    std::cout << "\n\n" << "Printing types....\n";
     for (auto elem : types_to_replace) {
-        cout << elem.first << "\t" << elem.second << endl;
+        std::cout << elem.first << "\t" << elem.second << '\n';
     }
 }
 
 // a vector to store changed locations
-vector<SourceLocation> variable_locations;
+std::vector<SourceLocation> variable_locations;
 
 
 // Replace the variable type for different input decl types
@@ -265,7 +264,7 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     virtual bool VisitCStyleCastExpr(CStyleCastExpr *cast) {
         if (not_in_main(cast))
             return true;
-        string type_name = cast->getTypeAsWritten().getAsString();
+        std::string type_name = cast->getTypeAsWritten().getAsString();
         for (auto t : types_to_replace) {
             if (type_name == t.first) {
                 SourceLocation loc_start = cast->getTypeInfoAsWritten()->getTypeLoc().getLocStart();
