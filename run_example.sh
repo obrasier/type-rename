@@ -9,7 +9,5 @@ if [[ ! -f ${FILE} ]]; then
   exit 1
 fi
 
-NEWFILE="${FILE%.cpp}"_new.cpp
-cp "$FILE" "$NEWFILE"
-./$EXE $NEWFILE -- $remainder
+./$EXE $FILE -- $remainder
 
