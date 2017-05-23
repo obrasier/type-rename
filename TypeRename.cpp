@@ -27,7 +27,6 @@ using namespace clang::tooling;
 using namespace llvm;
 
 Rewriter rewriter;
-bool can_change = false;
 
 FileID main_file;
 
@@ -189,7 +188,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         const Type *type = var->getType().getTypePtr();
         bool is_array = type->isArrayType();
 
-        errs() << "found variable with type: " << var_type << " static: " << is_static << " arr: " << is_array << "\n";
 
 
         if (is_array) {
@@ -215,13 +213,11 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         const Type *type = field->getType().getTypePtr();
         bool is_array = type->isArrayType();
 
-        errs() << "found field with type: " << var_type  << "\n";
 
 
         if (is_array) {
             const ArrayType *arr = type->getAsArrayTypeUnsafe();
             var_type = arr->getElementType().getAsString();
-            // errs() << "array type " << var_type << "\n";type->isArrayType()
         }
 
         // visit each variable declaration and replace if necessary
@@ -237,7 +233,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     virtual bool VisitCXXNamedCastExpr(CXXNamedCastExpr *cast) {
         if (not_in_main(cast))
             return true;
-        cout << "FOUND A CAST!" << endl;
         auto loc = cast->getAngleBrackets();
         auto in_start = cast->getLocStart();
         // setting it to in_start enables the use of auto for different input decls we use
@@ -258,7 +253,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
 
         // get the stringPtr from the range and convert to std::string
         std::string type_name = std::string(Lexer::getSourceText(range, rewriter.getSourceMgr(), rewriter.getLangOpts()));
-        cout << "s is: " << type_name << endl;
         for (auto type : types_to_replace) {
             if (type_name == type.first) {
                 rewriter.ReplaceText(var_start_loc, type_name.length(), type.second);
@@ -272,7 +266,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         if (not_in_main(cast))
             return true;
         string type_name = cast->getTypeAsWritten().getAsString();
-        cout << "c cast type: " << type_name << endl;
         for (auto t : types_to_replace) {
             if (type_name == t.first) {
                 SourceLocation loc_start = cast->getTypeInfoAsWritten()->getTypeLoc().getLocStart();
@@ -298,7 +291,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         }
         int num_args = expr->getNumArgs();
         auto type = expr->getType().getAsString();
-        cout << "found CXXConstructExpr: " << type << " num_args: " << num_args << endl;
         if (num_args) {
             // for(auto i = expr->arg_begin();i != expr->arg_end(); ++i) {
             //     arg = *i->getType().getAsString();
@@ -318,7 +310,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
     //         return true;
     //     }
     //     auto type = parm->getType().getAsString();
-    //     cout << "found ParmVarDecl: " << QualType::getAsString(parm->getType().split()) << endl;
 
     //     return true;
     // }
@@ -350,7 +341,7 @@ class VarASTConsumer : public ASTConsumer {
         /* we can use ASTContext to get the TranslationUnitDecl, which is
              a single Decl that collectively represents the entire source file */
         visitor->TraverseDecl(Context.getTranslationUnitDecl());
-        rewriter.overwriteChangedFiles();
+        // rewriter.overwriteChangedFiles();
     }
 
 };
