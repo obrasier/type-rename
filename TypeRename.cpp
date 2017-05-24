@@ -290,44 +290,6 @@ class VarVisitor : public RecursiveASTVisitor<VarVisitor> {
         return true;
     }
 
-    virtual bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl *decl) {
-        if (not_in_main(decl)) {
-            return true;
-        }
-        // std::cout << "Visiting ClassTemplateSpecializationDecl\n";
-        // const TemplateArgumentList &template_args = decl->getTemplateArgs();
-        // int num_args = template_args.size();
-        // if (num_args) {
-        //     for(int i = 0; i < num_args; ++i) {
-        //         auto param = template_args.get(i);
-        //         std::string arg = param.getAsType().getAsString();
-        //         for (auto elem : types_to_replace) {
-        //             if (arg == elem.first) {
-        //                 errs() << "FOUND A TEMPLATE ARG\n";
-        //                 //replace_text(param, elem.second);
-        //             }
-        //         }
-        //     }
-        // }
-        return true;
-    }
-
-    virtual bool VisitParmVarDecl(ParmVarDecl *parm) {
-        if (not_in_main(parm)) {
-            return true;
-        }
-        auto type = parm->getType().getAsString();
-
-        return true;
-    }
-
-    // virtual bool VisitDeclRefExpr(DeclRefExpr *expr) {
-    //     if (not_in_main(expr))
-    //         return true;
-
-    //     return true;
-
-    // }
 
 };
 
