@@ -19,6 +19,12 @@
 #include <iostream>
 #include <iterator>
 #include <algorithm>
+#include <cstdio>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <array>
+
 
 using namespace clang;
 using namespace clang::driver;
@@ -325,10 +331,29 @@ class VarFrontendAction : public ASTFrontendAction {
 };
 
 
+std::string exec(std::string command) {
+    const char * cmd = command.c_str();
+    std::array<char, 128> buffer;
+    std::string result;
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    while (!feof(pipe.get())) {
+        if (fgets(buffer.data(), 128, pipe.get()) != NULL)
+            result += buffer.data();
+    }
+    return result;
+}
+
 static llvm::cl::OptionCategory MyToolCategory("type-rename");
 
 int main(int argc, const char **argv) {
     fill_types();
+    if (argc < 2) {
+        std::cout << "Please add arguments." << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::string input_file(argv[1]);
+    std::string command_to_execute = "cat " + input_file;
     // print_types();
     // parse the command-line args passed to your code
     CommonOptionsParser op(argc, argv, MyToolCategory);
@@ -337,7 +362,15 @@ int main(int argc, const char **argv) {
 
     // run the Clang Tool, creating a new FrontendAction (explained below)
     Tool.run(newFrontendActionFactory<VarFrontendAction>().get());
+    FileID ID = rewriter.getSourceMgr().getMainFileID();
+    if (rewriter.getRewriteBufferFor(ID) != nullptr) {
+        RewriteBuffer &rewrite_buffer = rewriter.getEditBuffer(ID);
+        rewrite_buffer.write(outs());
+    }
+    else {
+        std::string file_out = exec(command_to_execute);
+        std::cout << file_out << std::endl;
+    }
 
-    rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(outs());
     return EXIT_SUCCESS;
 }
